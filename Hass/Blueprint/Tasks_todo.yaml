@@ -1,0 +1,117 @@
+blueprint:
+  name: Morning Todo Task Automation with Daily or Weekend Option
+  description: A blueprint to remove completed tasks and add new optional tasks, with options for daily or weekend execution.
+  domain: automation
+  input:
+    tasklist:
+      name: Todo List
+      description: The to-do list entity to manage.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - todo
+          multiple: false
+    schedule:
+      name: Update Frequency
+      description: Choose whether to run the task daily or only on weekends (Saturday).
+      selector:
+        select:
+          options:
+            - Daily
+            - Weekend
+    task_1_name:
+      name: Task 1 Name (Optional)
+      description: The name of the first to-do item.
+      selector:
+        text:
+      default: ""
+    task_2_name:
+      name: Task 2 Name (Optional)
+      description: The name of the second to-do item.
+      selector:
+        text:
+      default: ""
+    task_3_name:
+      name: Task 3 Name (Optional)
+      description: The name of the third to-do item.
+      selector:
+        text:
+      default: ""
+    task_4_name:
+      name: Task 4 Name (Optional)
+      description: The name of the fourth to-do item.
+      selector:
+        text:
+      default: ""
+    task_5_name:
+      name: Task 5 Name (Optional)
+      description: The name of the fifth to-do item.
+      selector:
+        text:
+      default: ""
+
+trigger:
+  - platform: time
+    at: "01:00:00"
+  - platform: time
+    at: "01:05:00"
+  - platform: event
+    event_type: manual_trigger # Allows manual execution
+
+condition:
+  - condition: or
+    conditions:
+      - condition: template
+        value_template: >
+          {% if trigger.platform == 'event' and trigger.event.event_type == 'manual_trigger' %}
+            true
+          {% else %}
+            {% if schedule == "Daily" %}
+              true
+            {% elif schedule == "Weekend" %}
+              {{ now().weekday() == 5 }}
+            {% else %}
+              false
+            {% endif %}
+          {% endif %}
+
+variables:
+  tasklist: !input tasklist
+  schedule: !input schedule
+  tasks:
+    - name: !input task_1_name
+    - name: !input task_2_name
+    - name: !input task_3_name
+    - name: !input task_4_name
+    - name: !input task_5_name
+
+action:
+  # Remove completed items from the to-do list
+  - service: todo.remove_completed_items
+    target:
+      entity_id: "{{ tasklist }}"
+
+  # Get existing tasks with "needs_action" status and store in response variable
+  - service: todo.get_items
+    target:
+      entity_id: "{{ tasklist }}"
+    data:
+      status:
+        - needs_action
+    response_variable: todos
+
+  - alias: Add new tasks if not already in "needs_action"
+    repeat:
+      for_each: "{{ tasks | selectattr('name', '!=', '') | list }}"
+      sequence:
+        - variables:
+            taskname: "{{ repeat.item.name }}"
+        - condition: template
+          value_template: >
+            {{ taskname not in todos[tasklist]['items'] | map(attribute='summary') | list }}
+        - service: todo.add_item
+          target:
+            entity_id: "{{ tasklist }}"
+          data:
+            item: "{{ taskname }}"
