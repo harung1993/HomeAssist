@@ -1,0 +1,90 @@
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - OPENVPN_USER=
+      - OPENVPN_PASSWORD=
+      - SERVER_CITIES=New York
+      - SERVER_COUNTRIES=United States         # Adjust as needed
+      - VPN_PROTOCOL=udp                       # Recommended for speed
+      - DNS=8.8.8.8,1.1.1.1                    # Set DNS to Google and Cloudflare
+      - FIREWALL_OUTBOUND_SUBNETS=  # Allow LAN access
+    ports:
+      - "8989:8989"                            # Sonarr Web UI through VPN
+      - "9117:9117"                            # Jackett Web UI through VPN
+      - "9091:9091"                            # Transmission Web UI through VPN
+      - "8080:8080"                            # qBittorrent Web UI
+      - "51415:51415"                          # BitTorrent TCP port
+      - "51415:51415/udp"                      # BitTorrent UDP port
+    volumes:
+      - /Users/harungunasekaran/Documents/torrr:/config
+    restart: unless-stopped
+
+  transmission:
+    image: linuxserver/transmission
+    container_name: transmission
+    environment:
+      - PUID=1000                              # Set to your user ID
+      - PGID=1000                              # Set to your group ID
+      - TZ=America/New_York                    # Set your timezone
+      - TRANSMISSION_WEB_UI=combustion         # Optional: Combustion Web UI
+    network_mode: "service:gluetun"            # Use Gluetun's network
+    depends_on:
+      - gluetun
+    volumes:
+      - /Users/harungunasekaran/Documents/torrr:/config/transmission
+      - /Volumes/Plex_backup/Multimedia:/downloads
+    restart: unless-stopped
+
+  qbittorrent:
+    image: linuxserver/qbittorrent
+    container_name: qbittorrent
+    environment:
+      - PUID=1000                              # Set to your user ID
+      - PGID=1000                              # Set to your group ID
+      - TZ=America/New_York                    # Set your timezone
+      - WEBUI_PORT=8080                        # qBittorrent Web UI port
+      - UMASK_SET=022                          # Optional: Set file permissions
+    network_mode: "service:gluetun"            # Use Gluetun's network
+    depends_on:
+      - gluetun
+    volumes:
+      - /Users/harungunasekaran/Documents/torrr:/config/qbittorrent
+      - /Volumes/Plex_backup/Multimedia:/downloads
+    restart: unless-stopped
+
+  sonarr:
+    image: linuxserver/sonarr
+    container_name: sonarr
+    environment:
+      - PUID=1000                              # Set to your user ID
+      - PGID=1000                              # Set to your group ID
+      - TZ=America/New_York                    # Set your timezone
+    network_mode: "service:gluetun"            # Use Gluetun's network
+    depends_on:
+      - gluetun
+    volumes:
+      - /Users/harungunasekaran/Documents/torrr:/config/sonarr
+      - /Volumes/Plex_backup/Multimedia:/downloads        # Same download path for all services
+      - /Volumes/Plex_backup/Multimedia/TV:/tv            # Path to store organized TV shows
+    restart: unless-stopped
+
+  jackett:
+    image: linuxserver/jackett
+    container_name: jackett
+    environment:
+      - PUID=1000                              # Set to your user ID
+      - PGID=1000                              # Set to your group ID
+      - TZ=America/New_York                    # Set your timezone
+    network_mode: "service:gluetun"            # Use Gluetun's network
+    depends_on:
+      - gluetun
+    volumes:
+      - /Users/harungunasekaran/Documents/torrr:/config/jackett
+      - /Volumes/Plex_backup/Multimedia:/downloads
+    restart: unless-stopped
