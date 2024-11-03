@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: seafile-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${ROOT_DB_PASSWORD}  # Set the root's password for MySQL service.
+      - MYSQL_LOG_CONSOLE=true
+      - MARIADB_AUTO_UPGRADE=1
+    volumes:
+      - /Users/harungunasekaran/Documents/seafile:/var/lib/mysql  # Path to MySQL data persistent store.
+    networks:
+      - seafile-net
+
+  memcached:
+    image: memcached:1.6.18
+    container_name: seafile-memcached
+    entrypoint: memcached -m 256
+    networks:
+      - seafile-net
+          
+  seafile:
+    image: seafileltd/seafile-mc:11.0-latest
+    container_name: seafile
+    ports:
+      - "80:80"
+      # - "443:443"  # Uncomment if using HTTPS.
+    volumes:
+      - /Volumes/Plex_backup/Files:/shared  # Path to Seafile data persistent store.
+    environment:
+      - DB_HOST=db
+      - DB_ROOT_PASSWD=${ROOT_DB_PASSWORD}  # Must match the root password of the MySQL service.
+      - TIME_ZONE=America/New_York  # Optional, set to your local time zone.
+      - SEAFILE_ADMIN_EMAIL=${ADMIN_EMAIL}  # Set admin email.
+      - SEAFILE_ADMIN_PASSWORD=${ADMIN_PASSWORD}  # Set admin password.
+      - SEAFILE_SERVER_LETSENCRYPT=false  # Set to false since we're not using HTTPS.
+      - SEAFILE_SERVER_HOSTNAME=192.168.68.51  # Set to 'localhost' for local access.
+    depends_on:
+      - db
+      - memcached
+    networks:
+      - seafile-net
+
+networks:
+  seafile-net:
+    driver: bridge
